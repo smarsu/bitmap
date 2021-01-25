@@ -201,11 +201,9 @@ packages:
   storages:
     dependency: "direct main"
     description:
-      path: "."
-      ref: HEAD
-      resolved-ref: f840f14ed6ef68ba1f61a878cdb0aa4e186eb05d
-      url: "https://github.com/smarsu/storages"
-    source: git
+      name: storages
+      url: "https://pub.dartlang.org"
+    source: hosted
     version: "0.0.3"
   stream_channel:
     dependency: transitive
