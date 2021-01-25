@@ -3,7 +3,7 @@
 # Run `pod lib lint bitmap.podspec' to validate before publishing.
 #
 Pod::Spec.new do |s|
-  s.name             = 'bitmap'
+  s.name             = 'sm_bitmap'
   s.version          = '0.0.1'
   s.summary          = 'A new flutter plugin project.'
   s.description      = <<-DESC
