@@ -1,10 +1,28 @@
+import 'dart:async';
 import 'dart:io';
+import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:bitmap/bitmap.dart';
 import 'package:flutter/material.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:storages/storages.dart';
+
+/// Scroll physics for limit the max velocity to be 16000.
+class BouncingScrollPhysicsEx extends BouncingScrollPhysics {
+  const BouncingScrollPhysicsEx({ ScrollPhysics parent }) : super(parent: parent);
+
+  @override
+  BouncingScrollPhysicsEx applyTo(ScrollPhysics ancestor) {
+    return BouncingScrollPhysicsEx(parent: buildParent(ancestor));
+  }
+
+  @override
+  double carriedMomentum(double existingVelocity) {
+    return existingVelocity.sign *
+        min(0.000816 * pow(existingVelocity.abs(), 1.967).toDouble(), 8000);
+  }
+}
 
 class Album extends StatefulWidget {
   @override
@@ -30,55 +48,54 @@ class _AlbumState extends State<Album> {
     super.initState();
     controller = ScrollController();
     init();
+
+    /// The speed slide by handle can be larger than 50k.
+    /// 
+    /// Use [BouncingScrollPhysicsEx] to limit the maximum speed.
+    Timer.periodic(Duration(milliseconds: 100), (timer) {
+      print('velocity: ${controller?.position?.activity?.velocity}');
+    });
   }
 
   @override
   void dispose() {
     controller?.dispose();
-    for (var path in list) {
-      File(path).deleteSync();
-    }
+    BitMapNaive.dispose();
     super.dispose();
   }
 
   init() async {
-    fixSizedStorage = FixSizedStorage('albumTest'); 
+    fixSizedStorage = FixSizedStorage('albumTest');
     await fixSizedStorage.init();
 
     var result = await PhotoManager.requestPermission();
     print('PhotoManager requestPermission ... $result');
 
     if (result) {
-      List<AssetPathEntity> assetPathEntityList = await PhotoManager.getAssetPathList();
+      List<AssetPathEntity> assetPathEntityList =
+          await PhotoManager.getAssetPathList();
       for (var assetPathEntity in assetPathEntityList) {
         List<AssetEntity> assetEntityList = await assetPathEntity.assetList;
         for (var assetEntity in assetEntityList) {
-          // if (assetEntity.type == AssetType.video) {
-            // String path = await getApplicationDocumentsPath();
-            print(assetEntity.id);
-            if (assetEntity.width > 0 && assetEntity.height > 0) {
-              String key = assetEntity.id.replaceAll('/', '_');
-              String path = await fixSizedStorage.get(key);
-              if (path == null) {
-                path = await fixSizedStorage.touch(key);
-                Uint8List thumbData = await assetEntity.thumbDataWithSize(width, height);
-                File(path).writeAsBytesSync(thumbData);
-                await fixSizedStorage.set(key, path);
-              }
-              list.add(path);
+          if (assetEntity.width > 0 && assetEntity.height > 0) {
+            String key = assetEntity.id.replaceAll('/', '_');
+            String path = await fixSizedStorage.get(key);
+            if (path == null) {
+              path = await fixSizedStorage.touch(key);
+              Uint8List thumbData =
+                  await assetEntity.thumbDataWithSize(width, height);
+              File(path).writeAsBytesSync(thumbData);
+              await fixSizedStorage.set(key, path);
             }
-          // }
-          // else {
-          //   String path = (await assetEntity.originFile).path;
-          //   list.add(path);
-          // }
+            list.add(path);
+          }
         }
       }
       setState(() {});
     }
-    print('end');
 
-    await convert();
+    // // For test dispose.
+    // await convert();
   }
 
   convert() async {
@@ -92,9 +109,6 @@ class _AlbumState extends State<Album> {
       if (!isBitMap) {
         await BitMapNaive.dispose();
       }
-
-      // /// Wait for finish [setState].
-      // await Future.delayed(Duration(milliseconds: 200));
     }
   }
 
@@ -103,59 +117,41 @@ class _AlbumState extends State<Album> {
     return Stack(
       children: [
         GridView.builder(
-          padding: EdgeInsets.all(1),
-          controller: controller,
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 4,
-            mainAxisSpacing: 1,
-            crossAxisSpacing: 1,
-            childAspectRatio: 1,
-          ), 
-          itemCount: list.length * 100000,
-          itemBuilder: (BuildContext context, int index) {
-            index = index % list.length;
-            return GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: () {
-                setState(() {
-                  comparePath = list[index];
-                  compare = true;
-                });
-              },
-              child: isBitMap
-                  ? BitMap(
-                      path: list[index],
-                      width: width.toDouble(),
-                      height: height.toDouble(),
-                      fit: BoxFit.cover,
-                    )
-                  : Image.file(
-                      File(list[index]),
-                      width: width.toDouble(),
-                      height: height.toDouble(),
-                      fit: BoxFit.cover,
-                    ),
-              // child: BitMap(
-              //   path: list[index],
-              //   width: width.toDouble(),
-              //   height: height.toDouble(),
-              //   fit: BoxFit.cover,
-              // ),
-              // child: Image.file(
-              //   File(list[index]),
-              //   width: width.toDouble(),
-              //   height: height.toDouble(),
-              //   fit: BoxFit.cover,
-              // ),
-            );
-            // return Image.file(
-            //   File(list[index]),
-            //   width: width.toDouble(),
-            //   height: height.toDouble(),
-            //   fit: BoxFit.cover,
-            // );
-          }
-        ),
+            padding: EdgeInsets.all(1),
+            controller: controller,
+            physics:  BouncingScrollPhysicsEx(),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 4,
+              mainAxisSpacing: 1,
+              crossAxisSpacing: 1,
+              childAspectRatio: 1,
+            ),
+            itemCount: list.length * 100000,
+            itemBuilder: (BuildContext context, int index) {
+              index = index % list.length;
+              return GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () {
+                  setState(() {
+                    comparePath = list[index];
+                    compare = true;
+                  });
+                },
+                child: isBitMap
+                    ? BitMap(
+                        path: list[index],
+                        width: width.toDouble(),
+                        height: height.toDouble(),
+                        fit: BoxFit.cover,
+                      )
+                    : Image.file(
+                        File(list[index]),
+                        width: width.toDouble(),
+                        height: height.toDouble(),
+                        fit: BoxFit.cover,
+                      ),
+              );
+            }),
         compare
             ? Positioned(
                 top: 0,
@@ -170,13 +166,13 @@ class _AlbumState extends State<Album> {
                   },
                   child: Image.file(
                     File(comparePath),
-                    // width: width.toDouble(),
-                    // height: height.toDouble(),
                     fit: BoxFit.cover,
                   ),
-                )
-              )
-            : Container(width: 0, height: 0,),
+                ))
+            : Container(
+                width: 0,
+                height: 0,
+              ),
         Positioned(
           bottom: 0,
           left: 0,
@@ -184,10 +180,11 @@ class _AlbumState extends State<Album> {
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTap: () {
-              controller.animateTo(controller.offset + 8000 * 10, duration: Duration(milliseconds: 1000 * 10), curve: Curves.linear);
+              controller.animateTo(controller.offset + 8000 * 10,
+                  duration: Duration(milliseconds: 1000 * 10),
+                  curve: Curves.linear);
             },
             onLongPress: () {
-              // controller.jumpTo(0);
               isBitMap = !isBitMap;
               setState(() {});
             },

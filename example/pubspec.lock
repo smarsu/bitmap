@@ -203,10 +203,10 @@ packages:
     description:
       path: "."
       ref: HEAD
-      resolved-ref: "269d61c973c3cc974dfa3b526ac60471e04349a2"
+      resolved-ref: f840f14ed6ef68ba1f61a878cdb0aa4e186eb05d
       url: "https://github.com/smarsu/storages"
     source: git
-    version: "0.0.2"
+    version: "0.0.3"
   stream_channel:
     dependency: transitive
     description:

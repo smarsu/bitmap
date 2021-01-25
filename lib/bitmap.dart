@@ -9,13 +9,15 @@ class BitMapNaive {
 
   /// Dispose all free textures.
   ///
+  /// You should call this function every time you quit the album. And if not,
+  /// the textures will always stored in the memory. And don't be worry, the
+  /// memory usage will not be too much.
   ///
+  /// Note that some texture will be kept as the are under build. This function
+  /// will only dispose the textures which are free and in the [textureIdPool].
   static Future dispose() async {
     for (var key in textureIdPool.keys) {
-      var textureIds = textureIdPool[key].sublist(0);
-      // for (var textureId in textureIds) {
-      //   textureIdPool[key].remove(textureId);
-      // }
+      var textureIds = textureIdPool[key].sublist(0); // deepcopy.
       textureIdPool[key] = [];
       await _channel.invokeMethod('dl', {
         'textureIds': textureIds,
@@ -24,12 +26,16 @@ class BitMapNaive {
   }
 
   /// Add [textureId] to the [textureIdPool].
+  ///
+  /// Every [textureId] have a specially [width] and [height].
+  ///
+  /// [textureId] should always >= 0.
   static void putTextureId(int textureId, double width, double height) {
     if (textureId == null) {
       return;
     }
 
-    Size key = Size(width, height);
+    Size key = Size(width, height); // [Size] can be key but [List] can not.
     var textureIds = textureIdPool[key];
     if (textureIds == null) {
       textureIdPool[key] = [textureId];
@@ -40,7 +46,7 @@ class BitMapNaive {
 
   /// Render the image on the interface.
   ///
-  /// The will make cache of textureId and make cache of bitmap.
+  /// This function will make cache of textureId and make cache of bitmap.
   static Future<int> render(
       String path, double width, double height, BoxFit fit) async {
     await initialize;
@@ -51,7 +57,7 @@ class BitMapNaive {
     bool findCache = cache[0];
     String value = cache[1];
 
-    print('_tryToGetTextureId ... $textureId, findCache ... $findCache');
+    print('textureId ... $textureId, findCache ... $findCache');
     // For some case, there is no need to transfer so many params.
     int invokedTextureId = await _channel.invokeMethod('r', {
       'textureId': textureId,
@@ -78,7 +84,7 @@ class BitMapNaive {
   ///
   /// Note to call [putTextureId] after finish use this [textureId].
   ///
-  /// The [textureId] is always >= 0.
+  /// The true [textureId] is always >= 0.
   static int _tryToGetTextureId(double width, double height) {
     Size key = Size(width, height);
     var textureIds = textureIdPool[key];
@@ -127,6 +133,8 @@ class BitMapNaive {
   /// Line [path], [width], [height] and [fit] to [key].
   ///
   /// This key is for [FixSizedStorage].
+  ///
+  /// Note that the root of [path] will be mutable of every version of app.
   static String _toKey(String path, double width, double height, BoxFit fit) {
     path = path.split('/').last;
     return '${path}_${width}_${height}_$fit';
@@ -172,7 +180,7 @@ class BitMapNaive {
   /// A pool of textureIds.
   ///
   /// [Size] is hashable, [List] is un-hashable.
-  /// 
+  ///
   /// Todo: Consider use linked list for faster to pop and put.
   static Map<Size, List<int>> textureIdPool = {};
 
@@ -182,6 +190,10 @@ class BitMapNaive {
   static Future<void> initialize = _init();
 }
 
+/// Create a [BitMap] widget. 
+///
+/// Note if you hot reload without [BitMapNaive.dispose], the textures will not 
+/// be recycled and some bad images will show out.
 class BitMap extends StatefulWidget {
   BitMap({
     this.path,
@@ -203,7 +215,7 @@ class BitMap extends StatefulWidget {
   ///
   /// The default varies based on the other fields. See the discussion at
   /// [paintImage].
-  /// 
+  ///
   /// Note only support [BoxFit.conver] now.
   final BoxFit fit;
 
@@ -246,8 +258,7 @@ class BitMapNaiveState extends State<BitMap> {
       _textureId = value;
 
       if (mounted) {
-        setState(() {
-        });
+        setState(() {});
       } else {
         // dispose have been called. you should put back textureId now.
         put();
