@@ -1,8 +1,7 @@
 name: bitmap
-description: A new flutter plugin project.
+description: `BitMap` is an alternative to `Image.file`, achieving higher performance image display.
 version: 0.0.1
-author:
-homepage:
+homepage: https://github.com/smarsu/bitmap
 
 environment:
   sdk: ">=2.7.0 <3.0.0"
