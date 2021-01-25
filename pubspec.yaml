@@ -1,4 +1,4 @@
-name: bitmap
+name: sm_bitmap
 description: BitMap is an alternative to Image.file, achieving higher performance image display.
 version: 0.0.1
 homepage: https://github.com/smarsu/bitmap
